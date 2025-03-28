@@ -9,39 +9,46 @@ const Streamer = () => {
   const [streamId, setStreamId] = useState("");
 
   useEffect(() => {
-    if (!isStreaming) return;
+    if (!isStreaming || !streamId) return;
 
     let stream;
     let socket;
-    let peer;
 
-    const setUpStreamingMode = async () => {
+    const peers = {};
+
+    const setUpStreaming = async () => {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       socket = io(SIGNALING_SERVER_URL);
-      peer = new Peer({
-        initiator: false,
-        stream: stream,
+
+      socket.emit("room:join", streamId);
+
+      socket.on("room:listener-joined", (listenerId) => {
+        const peer = new Peer({
+          initiator: true,
+          stream: stream,
+        });
+
+        peer.on("signal", (data) => {
+          socket.emit("peer:signal", listenerId, data);
+        });
+
+        peers[listenerId] = peer;
       });
 
-      socket.emit("join", streamId);
-
-      peer.on("signal", (data) => {
-        socket.emit("signal", streamId, data);
-      });
-
-      socket.on("signal", (data) => {
-        peer.signal(data);
+      socket.on("peer:signal", (originId, data) => {
+        peers[originId]?.signal(data);
       });
     };
 
-    setUpStreamingMode();
+    setUpStreaming();
 
     return () => {
       if (stream) stream.getTracks().forEach((track) => track.stop());
       if (socket) socket.disconnect();
-      if (peer) peer.destroy();
+
+      Object.values(peers).forEach((peer) => peer.destroy());
     };
-  }, [isStreaming]);
+  }, [isStreaming, streamId]);
 
   const startStream = () => {
     setStreamId(Math.random().toString(36).slice(2, 9));
@@ -52,11 +59,11 @@ const Streamer = () => {
     <>
       <h1>Streamer</h1>
 
-      {streamId && <div>Stream ID: {streamId}</div>}
-
       <button onClick={startStream} disabled={isStreaming}>
         Start Streaming Audio
       </button>
+
+      {streamId && <div>Stream ID: {streamId}</div>}
     </>
   );
 };

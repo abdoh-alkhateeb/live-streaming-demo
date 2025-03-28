@@ -5,14 +5,23 @@ const io = require("socket.io")(server, { cors: { origin: "*" } });
 io.on("connection", (socket) => {
   console.log(`User connected ${socket.id}`);
 
-  socket.on("join", (streamId) => {
+  socket.on("room:join", (streamId) => {
     socket.join(streamId);
     console.log(`User ${socket.id} joined ${streamId}`);
+
+    const users = io.sockets.adapter.rooms.get(streamId);
+
+    if (users.size > 1) {
+      const streamerId = [...users][0];
+
+      io.to(streamerId).emit("room:listener-joined", socket.id);
+      io.to(socket.id).emit("room:streamer-connected", streamerId);
+    }
   });
 
-  socket.on("signal", (streamId, data) => {
-    socket.to(streamId).emit("signal", data);
-    console.log(`Signal from ${socket.id} to ${streamId}`);
+  socket.on("peer:signal", (targetId, data) => {
+    socket.to(targetId).emit("peer:signal", socket.id, data);
+    console.log(`Signal from ${socket.id} to ${targetId}`);
   });
 
   socket.on("disconnect", () => {

@@ -5,24 +5,30 @@ import { io } from "socket.io-client";
 const SIGNALING_SERVER_URL = process.env.SIGNALING_SERVER_URL || "http://localhost:3000";
 
 const Listener = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [streamId, setStreamId] = useState("");
   const audioRef = useRef(null);
 
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isListening || !streamId) return;
 
     const socket = io(SIGNALING_SERVER_URL);
-    const peer = new Peer({ initiator: true });
+    const peer = new Peer({ initiator: false });
 
-    socket.emit("join", streamId);
+    let streamerId;
 
-    peer.on("signal", (data) => {
-      socket.emit("signal", streamId, data);
+    socket.emit("room:join", streamId);
+
+    socket.once("room:streamer-connected", (originId) => {
+      streamerId = originId;
     });
 
-    socket.on("signal", (data) => {
+    socket.on("peer:signal", (_, data) => {
       peer.signal(data);
+    });
+
+    peer.on("signal", (data) => {
+      socket.emit("peer:signal", streamerId, data);
     });
 
     peer.on("stream", (stream) => {
@@ -36,7 +42,7 @@ const Listener = () => {
       socket.disconnect();
       peer.destroy();
     };
-  }, [isConnected, streamId]);
+  }, [isListening, streamId]);
 
   return (
     <>
@@ -46,11 +52,11 @@ const Listener = () => {
         type="text"
         value={streamId}
         onChange={({ target: { value } }) => setStreamId(value)}
-        disabled={isConnected}
+        disabled={isListening}
       />
 
-      <button onClick={() => streamId && setIsConnected(true)} disabled={isConnected}>
-        Connect to Stream
+      <button onClick={() => streamId && setIsListening(true)} disabled={isListening}>
+        Listen to Audio Stream
       </button>
 
       <audio ref={audioRef} controls autoPlay />

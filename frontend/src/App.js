@@ -5,18 +5,22 @@ import Listener from "./Listener";
 const App = () => {
   const [mode, setMode] = useState(null);
 
-  if (!mode) {
-    return (
-      <>
-        <h1>Select Role</h1>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "300px" }}>
+      {!mode ? (
+        <>
+          <h1>Select Role</h1>
 
-        <button onClick={() => setMode("streaming")}>Streamer</button>
-        <button onClick={() => setMode("listening")}>Listener</button>
-      </>
-    );
-  }
-
-  return mode === "streaming" ? <Streamer /> : <Listener />;
+          <button onClick={() => setMode("streaming")}>Streamer</button>
+          <button onClick={() => setMode("listening")}>Listener</button>
+        </>
+      ) : mode === "streaming" ? (
+        <Streamer />
+      ) : (
+        <Listener />
+      )}
+    </div>
+  );
 };
 
 export default App;
